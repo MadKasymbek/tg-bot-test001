@@ -27,12 +27,12 @@ function preload() {
 
     // Загружаем твои Спрайт-листы. 
     // ВНИМАНИЕ: frameWidth и frameHeight должны точно совпадать с размером ОДНОГО кадра в твоей картинке!
-    this.load.spritesheet('gladiator', 'assets/gladiator.png', { 
+    this.load.spritesheet('gladiator', 'gladiator.png', { 
         frameWidth: 128, 
         frameHeight: 128 
     });
     
-    this.load.spritesheet('skeleton', 'assets/skeleton.png', { 
+    this.load.spritesheet('skeleton', 'skeleton.png', { 
         frameWidth: 128, 
         frameHeight: 128 
     });
