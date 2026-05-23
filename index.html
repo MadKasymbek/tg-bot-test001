@@ -3,37 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mobitva Arena</title>
+    <title>Mobitva Arena MVP</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #000; overflow: hidden;
+            background-color: #0a0a0a; color: #fff;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden; user-select: none; -webkit-user-select: none;
         }
 
-        /* Контейнер для графики Phaser */
-        #game-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+        /* Арена с фоном */
+        .battlefield {
+            height: 55vh;
+            background: radial-gradient(circle, #1a1a1a 0%, #050505 100%);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 20px; box-sizing: border-box; position: relative;
         }
 
-        /* UI слой поверх игры (современный Glassmorphism) */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;
-            pointer-events: none; /* Пропускаем клики сквозь пустые места */
-            display: flex; flex-direction: column; justify-content: space-between;
+        .character {
+            width: 130px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px;
+            transition: transform 0.2s ease;
         }
 
-        .top-bar {
-            display: flex; justify-content: space-between; padding: 20px;
+        /* Фокус на персонаже внутри твоего спрайт-листа средствами CSS */
+        .avatar-box {
+            width: 110px; height: 110px; border-radius: 12px; border: 2px solid #ff9f43;
+            overflow: hidden; background: #111; box-shadow: 0 0 15px rgba(255,159,67,0.3);
+            position: relative;
         }
+        .enemy .avatar-box { border-color: #a31aff; box-shadow: 0 0 15px rgba(163,26,255,0.3); }
+
+        /* Отображаем только верхнего левого персонажа из твоего файла, масштабируя его */
+        .sprite-img {
+            position: absolute;
+            top: -65px; /* Смещаем заголовок вверх */
+            left: -10px;
+            width: 500px; /* Имитируем масштаб */
+        }
+        .enemy .sprite-img { transform: scaleX(-1); left: -380px; } /* Зеркалим врага */
 
         .player-card {
-            background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px; padding: 10px 15px; width: 120px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px; padding: 6px; width: 100%; font-size: 12px; text-align: center;
+        }
+        .hp-bg { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+        .hp-fill { height: 100%; width: 100%; transition: width 0.3s ease; }
+        .hero-hp { background: #ff5252; }
+        .enemy-hp { background: #a31aff; }
+
+        /* Анимации ударов и урона */
+        .atk-hero { animation: lungeRight 0.3s ease; }
+        .atk-enemy { animation: lungeLeft 0.3s ease; }
+        .hurt { animation: shake 0.3s ease; filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5); }
+
+        @keyframes lungeRight { 50% { transform: translateX(40px); } }
+        @keyframes lungeLeft { 50% { transform: translateX(-40px); } }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+
+        /* Лог боя */
+        #log {
+            height: 12vh; background: #000; border-top: 1px solid #222; border-bottom: 1px solid #222;
+            padding: 10px; overflow-y: auto; font-size: 12px; box-sizing: border-box;
+        }
+
+        /* Панель управления */
+        .controls { height: 28vh; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;}
+        .zones { display: flex; gap: 10px; }
+        .zone-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .zone-title { color: #555; font-size: 10px; text-align: center; font-weight: bold; text-transform: uppercase; }
+        .btn-zone {
+            background: #161616; border: 1px solid #222; color: #ccc; padding: 8px; border-radius: 6px; text-align: center; font-size: 12px;
+        }
+        .btn-zone.active-atk { background: rgba(255, 159, 67, 0.2); border-color: #ff9f43; color: #ff9f43; font-weight: bold; }
+        .btn-zone.active-def { background: rgba(112, 161, 255, 0.2); border-color: #70a1ff; color: #70a1ff; font-weight: bold; }
+        
+        .btn-action {
+            width: 100%; padding: 12px; border-radius: 8px; border: none;
+            background: #d35400; color: #fff; font-size: 14px; font-weight: bold; text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="battlefield">
+        <div class="character hero" id="heroChar">
+            <div class="player-card">
+                <div style="font-weight:bold; color:#ff9f43;" id="heroName">Гладиатор</div>
+                <div id="heroInfo">Ур. 1 | HP: 100/100</div>
+                <div class="hp-bg"><div class="hp-fill hero-hp" id="heroHpFill"></div></div>
+            </div>
+            <div class="avatar-box">
+                <img class="sprite-img" src="gladiator.png" onerror="this.src='1000344443.png'">
+            </div>
+        </div>
+
+        <div class="character enemy" id="enemyChar">
+            <div class="player-card">
+                <div style="font-weight:bold; color:#a31aff;" id="enemyName">Скелет</div>
+                <div id="enemyInfo">HP: 80/80</div>
+                <div class="hp-bg"><div class="hp-fill enemy-hp" id="enemyHpFill"></div></div>
+            </div>
+            <div class="avatar-box">
+                <img class="sprite-img" src="skeleton.png" onerror="this.src='1000344441.png'">
+            </div>
+        </div>
+    </div>
+
+    <div id="log">
+        <div style="color: #f1c40f;">⚔️ Арена загружена! Выберите зоны и нажмите кнопку ТУТ.</div>
+    </div>
+
+    <div class="controls">
+        <div class="zones">
+            <div class="zone-col">
+                <div class="zone-title">Атака</div>
+                <div class="btn-zone active-atk" onclick="selectZone('atk', 'head', this)">Голова</div>
+                <div class="btn-zone" onclick="selectZone('atk', 'body', this)">Корпус</div>
+                <div class="btn-zone" onclick="selectZone('atk', 'legs', this)">Ноги</div>
+            </div>
+            <div class="zone-col">
+                <div class="zone-title">Защита</div>
+                <div class="btn-zone active-def" onclick="selectZone('def', 'head', this)">Голова</div>
+                <div class="btn-zone" onclick="selectZone('def', 'body', this)">Корпус</div>
+                <div class="btn-zone" onclick="selectZone('def', 'legs', this)">Ноги</div>
+            </div>
+        </div>
+        <button class="btn-action" id="actionBtn" onclick="makeTurn()">УДАРИТЬ</button>
+    </div>
+
+    <script>
+        const tg = window
             color: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
