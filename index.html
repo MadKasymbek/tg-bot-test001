@@ -3,461 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Хроники Атамуры</title>
+    <title>Atamura RPG - Mobitva Style</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --primary: #00ffcc;
-            --danger: #ff3366;
-            --bg: #050508;
-            --panel: rgba(15, 15, 20, 0.85);
-        }
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: var(--bg); color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden; user-select: none; -webkit-user-select: none;
-        }
-
-        #game-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 55vh; z-index: 1; }
-
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;
-            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
-        }
-
-        /* Статусы сверху */
-        .top-hud { display: flex; justify-content: space-between; padding: 12px; }
-        .glass-box {
-            background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 10px; width: 45%;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: auto;
-        }
-        .char-name { font-weight: 800; font-size: 13px; text-transform: uppercase; margin-bottom: 4px; }
-        .hero-text { color: var(--primary); text-shadow: 0 0 5px rgba(0,255,204,0.5); }
-        .enemy-text { color: var(--danger); text-shadow: 0 0 5px rgba(255,51,102,0.5); }
-        .stats { font-size: 11px; color: #aaa; }
+        /* БАЗОВЫЕ СТИЛИ */
+        body { margin: 0; background: #0d0d12; color: #fff; font-family: sans-serif; overflow: hidden; user-select: none; }
         
-        .hp-track { width: 100%; height: 6px; background: rgba(0,0,0,0.5); border-radius: 3px; margin-top: 6px; overflow: hidden; }
-        .hp-fill { height: 100%; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .hero-hp { background: linear-gradient(90deg, #00ffcc, #0088ff); }
-        .enemy-hp { background: linear-gradient(90deg, #ff3366, #ff8800); }
-
-        /* Сюжет и Лог */
-        .story-banner {
-            margin: 0 12px; padding: 10px; background: rgba(0, 255, 204, 0.05);
-            border: 1px solid rgba(0, 255, 204, 0.2); border-radius: 8px;
-            font-size: 12px; color: #fff; text-align: center; font-style: italic; pointer-events: auto;
-        }
+        /* СТАРТОВЫЙ ЭКРАН */
+        #start-screen { position: absolute; width: 100%; height: 100%; background: #050508; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
         
-        #log-container {
-            height: 12vh; background: rgba(0,0,0,0.7); border-top: 1px solid #1a1a1a;
-            padding: 10px; overflow-y: auto; font-size: 13px; pointer-events: auto;
-        }
-
-        /* Панель управления */
-        .control-deck {
-            background: rgba(10, 10, 12, 0.95); padding: 15px; border-radius: 20px 20px 0 0;
-            border-top: 1px solid rgba(255,255,255,0.1); pointer-events: auto; box-sizing: border-box;
-        }
-        .zones { display: flex; gap: 10px; margin-bottom: 12px; }
-        .zone-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-        .zone-title { color: #888; font-size: 10px; text-align: center; font-weight: bold; letter-spacing: 1px; }
-
-        .btn-zone {
-            background: #111; border: 1px solid #333; color: #888; padding: 12px;
-            border-radius: 8px; text-align: center; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;
-        }
-        .btn-zone.active-atk { background: rgba(0,255,204,0.15); border-color: var(--primary); color: var(--primary); }
-        .btn-zone.active-def { background: rgba(0,136,255,0.15); border-color: #0088ff; color: #0088ff; }
-        
-        .action-btn {
-            width: 100%; padding: 16px; border-radius: 12px; border: none;
-            background: linear-gradient(135deg, var(--primary), #0088ff); color: #000;
-            font-size: 16px; font-weight: 900; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 15px rgba(0,255,204,0.3);
-        }
-        .action-btn:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
-
-        /* Экран загрузки / Старта */
-        #start-screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg); z-index: 10; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; pointer-events: auto;
-        }
-    </style>
-</head>
-<body>
-
-    <canvas id="game-canvas"></canvas>
-
-    <div id="ui-layer" style="display: none;">
-        <div class="top-hud">
-            <div class="glass-box">
-                <div class="char-name hero-text" id="ui-hero-name">Герой</div>
-                <div class="stats" id="ui-hero-stats">Ур. 1 | HP: 100</div>
-                <div class="hp-track"><div class="hp-fill hero-hp" id="ui-hero-hp"></div></div>
-            </div>
-            <div class="glass-box" style="text-align: right;">
-                <div class="char-name enemy-text" id="ui-enemy-name">Босс</div>
-                <div class="stats" id="ui-enemy-stats">HP: 100</div>
-                <div class="hp-track"><div class="hp-fill enemy-hp" id="ui-enemy-hp" style="float: right;"></div></div>
-            </div>
-        </div>
-
-        <div class="story-banner" id="ui-story">Сюжет загружается...</div>
-
-        <div id="log-container"></div>
-
-        <div class="control-deck">
-            <div class="zones">
-                <div class="zone-col">
-                    <div class="zone-title">ОРУЖИЕ (АТАКА)</div>
-                    <div class="btn-zone active-atk" onclick="setZone('atk', 'head', this)">Голова</div>
-                    <div class="btn-zone" onclick="setZone('atk', 'body', this)">Корпус</div>
-                    <div class="btn-zone" onclick="setZone('atk', 'legs', this)">Ноги</div>
-                </div>
-                <div class="zone-col">
-                    <div class="zone-title">ЩИТ (ЗАЩИТА)</div>
-                    <div class="btn-zone active-def" onclick="setZone('def', 'head', this)">Голова</div>
-                    <div class="btn-zone" onclick="setZone('def', 'body', this)">Корпус</div>
-                    <div class="btn-zone" onclick="setZone('def', 'legs', this)">Ноги</div>
-                </div>
-            </div>
-            <button class="action-btn" id="btn-fight" onclick="executeTurn()">АТАКОВАТЬ</button>
-        </div>
-    </div>
-
-    <div id="start-screen">
-        <h1 style="color: #00ffcc; margin-bottom: 10px; text-align: center;">ХРОНИКИ АТАМУРЫ</h1>
-        <p style="color: #aaa; font-size: 14px; text-align: center; padding: 0 20px;">Нажмите кнопку ниже, чтобы запустить игровой движок и синхронизировать данные.</p>
-        <button class="action-btn" style="width: 80%; margin-top: 20px;" onclick="initGame()">ВОЙТИ В БАШНЮ</button>
-    </div>
-
-    <script>
-        // --- БАЗОВЫЕ НАСТРОЙКИ ---
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-
-        const canvas = document.getElementById('game-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        let width, height;
-        let isProcessing = false;
-        let currentAtk = 'head', currentDef = 'head';
-        
-        // --- ДАННЫЕ ИГРЫ ---
-        let player = { name: "Сотрудник", hp: 120, maxHp: 120, dmg: 15, lvl: 1, exp: 0, chapter: 0 };
-        let enemy = { name: "", hp: 100, maxHp: 100, dmg: 10 };
-
-        const chapters = [
-            { title: "Глава 1: Котлован Хаоса", boss: "Голем Котлована", type: "golem", hpMult: 1, dmgMult: 1, desc: "Строительная площадка захвачена. Огромный Голем из бетона и арматуры преграждает путь." },
-            { title: "Глава 2: Забытый Архив", boss: "Призрак Реестра", type: "ghost", hpMult: 1.5, dmgMult: 1.5, desc: "В бумагах завелась темная магия. Бесплотный дух питается непроверенными договорами." },
-            { title: "Глава 3: Финансовая Бездна", boss: "Теневой Аудитор", type: "auditor", hpMult: 2.2, dmgMult: 2, desc: "Хранитель золота Атамуры. Он не прощает ошибок в расчетах." }
-        ];
-
-        // --- ДВИЖОК ГРАФИКИ ---
-        let entities = {};
-        let particles = [];
-        let gridOffset = 0; // Для анимации 3D пола
-
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight * 0.55;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        function initGame() {
-            if (tg.initDataUnsafe?.user?.first_name) {
-                player.name = tg.initDataUnsafe.user.first_name;
-            }
-            document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('ui-layer').style.display = 'flex';
-            
-            loadChapter();
-            requestAnimationFrame(renderLoop);
-        }
-
-        function loadChapter() {
-            if (player.chapter >= chapters.length) player.chapter = 0; // Цикл игры
-            const ch = chapters[player.chapter];
-            
-            enemy.name = ch.boss;
-            enemy.maxHp = Math.floor(80 * ch.hpMult) + (player.lvl * 10);
-            enemy.hp = enemy.maxHp;
-            enemy.dmg = Math.floor(10 * ch.dmgMult) + (player.lvl * 2);
-            
-            // Настройка сущностей для рендера
-            entities.hero = { x: width * 0.25, y: height * 0.6, targetX: width * 0.25, color: '#00ffcc', type: 'hero', state: 'idle' };
-            entities.enemy = { x: width * 0.75, y: height * 0.6, targetX: width * 0.75, color: '#ff3366', type: ch.type, state: 'idle' };
-
-            document.getElementById('ui-story').innerText = ch.desc;
-            log(`⚔️ <b>${ch.title}</b> началась!`, '#fff');
-            updateUI();
-        }
-
-        // --- ОТРИСОВКА ---
-        function drawGrid() {
-            ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
-            ctx.lineWidth = 1;
-            gridOffset = (gridOffset + 1) % 40;
-            
-            // Горизонтальные линии (эффект движения вперед)
-            for(let y = height * 0.4; y < height; y += 40) {
-                let actualY = y + (gridOffset * ((y - height*0.4) / height));
-                ctx.beginPath(); ctx.moveTo(0, actualY); ctx.lineTo(width, actualY); ctx.stroke();
-            }
-            // Вертикальные линии перспективы
-            for(let x = -width; x < width * 2; x += 60) {
-                ctx.beginPath(); ctx.moveTo(width/2, height*0.4); ctx.lineTo(x, height); ctx.stroke();
-            }
-        }
-
-        function drawCharacter(ent) {
-            ctx.save();
-            ctx.translate(ent.x, ent.y);
-            
-            // Дыхание
-            let bob = (ent.state === 'idle') ? Math.sin(Date.now() * 0.005) * 5 : (Math.random() * 10 - 5);
-            ctx.translate(0, bob);
-
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = ent.color;
-            ctx.fillStyle = ent.color;
-            ctx.strokeStyle = '#fff';
-
-            if (ent.type === 'hero') {
-                // Кибер-Рыцарь (Игрок)
-                ctx.beginPath(); ctx.moveTo(-15, 40); ctx.lineTo(0, -10); ctx.lineTo(15, 40); ctx.fill(); // Плащ
-                ctx.beginPath(); ctx.arc(0, -25, 12, 0, Math.PI*2); ctx.fill(); // Голова
-                ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(30, -30); ctx.stroke(); // Меч
-            } 
-            else if (ent.type === 'golem') {
-                ctx.fillRect(-30, -40, 60, 80); // Квадратный голем
-                ctx.fillStyle = '#000'; ctx.fillRect(-15, -20, 10, 10); ctx.fillRect(5, -20, 10, 10); // Глаза
-            }
-            else if (ent.type === 'ghost') {
-                ctx.beginPath(); ctx.moveTo(-20, 40); ctx.lineTo(0, -40); ctx.lineTo(20, 40); ctx.fill(); // Треугольный призрак
-                ctx.beginPath(); ctx.arc(0, 10, 8, 0, Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
-            }
-            else if (ent.type === 'auditor') {
-                ctx.beginPath(); ctx.arc(0, 0, 35, 0, Math.PI*2); ctx.fill(); // Круглый босс
-                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(-20, -10); ctx.lineTo(20, -10); ctx.lineTo(0, 20); ctx.fill(); // Глаз
-            }
-
-            ctx.restore();
-        }
-
-        function spawnParticles(x, y, color) {
-            for(let i=0; i<20; i++) {
-                particles.push({
-                    x: x, y: y,
-                    vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
-                    life: 1.0, color: color
-                });
-            }
-        }
-
-        function renderLoop() {
-            ctx.fillStyle = 'rgba(5, 5, 8, 0.4)'; // Motion blur
-            ctx.fillRect(0, 0, width, height);
-
-            drawGrid();
-
-            // Анимация перемещения
-            entities.hero.x += (entities.hero.targetX - entities.hero.x) * 0.2;
-            entities.enemy.x += (entities.enemy.targetX - entities.enemy.x) * 0.2;
-
-            drawCharacter(entities.hero);
-            drawCharacter(entities.enemy);
-
-            // Отрисовка частиц
-            for (let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i];
-                p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-                if (p.life <= 0) { particles.splice(i, 1); continue; }
-                
-                ctx.globalAlpha = p.life;
-                ctx.fillStyle = p.color;
-                ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
-                ctx.globalAlpha = 1.0;
-            }
-
-            requestAnimationFrame(renderLoop);
-        }
-
-        // --- МЕХАНИКА БОЯ ---
-        function setZone(type, val, btnEl) {
-            if (isProcessing) return;
-            const parent = btnEl.parentElement;
-            parent.querySelectorAll('.btn-zone').forEach(b => b.classList.remove('active-atk', 'active-def'));
-            
-            if (type === 'atk') { currentAtk = val; btnEl.classList.add('active-atk'); } 
-            else { currentDef = val; btnEl.classList.add('active-def'); }
-        }
-
-        const zName = { head: "Голову", body: "Корпус", legs: "Ноги" };
-
-        function executeTurn() {
-            if (isProcessing) return;
-            isProcessing = true;
-            document.getElementById('btn-fight').disabled = true;
-
-            const zones = ['head', 'body', 'legs'];
-            const eAtk = zones[Math.floor(Math.random() * 3)];
-            const eDef = zones[Math.floor(Math.random() * 3)];
-
-            // 1. УДАР ИГРОКА
-            entities.hero.targetX = width * 0.45; // Рывок вперед
-            
-            setTimeout(() => {
-                if (currentAtk === eDef) {
-                    log(`🛡️ ${enemy.name} заблокировал удар в ${zName[currentAtk]}!`, '#ff3366');
-                    spawnParticles(entities.enemy.x, entities.enemy.y, '#ffffff');
-                } else {
-                    let d = player.dmg + Math.floor(Math.random() * 5);
-                    enemy.hp -= d;
-                    log(`💥 Вы пробили ${zName[currentAtk]}! Нанесено ${d} урона.`, '#00ffcc');
-                    entities.enemy.state = 'hurt';
-                    spawnParticles(entities.enemy.x, entities.enemy.y, '#ff3366');
-                    setTimeout(() => entities.enemy.state = 'idle', 300);
-                }
-                
-                entities.hero.targetX = width * 0.25; // Отскок назад
-                updateUI();
-
-                if (enemy.hp <= 0) return win();
-
-                // 2. ОТВЕТ ВРАГА
-                setTimeout(() => {
-                    entities.enemy.targetX = width * 0.55; // Рывок врага
-                    
-                    setTimeout(() => {
-                        if (eAtk === currentDef) {
-                            log(`🛡️ Вы отразили атаку врага в ${zName[eAtk]}!`, '#00ffcc');
-                            spawnParticles(entities.hero.x, entities.hero.y, '#ffffff');
-                        } else {
-                            let ed = enemy.dmg + Math.floor(Math.random() * 4);
-                            player.hp -= ed;
-                            log(`🩸 ${enemy.name} нанес ${ed} урона в ${zName[eAtk]}.`, '#ff3366');
-                            entities.hero.state = 'hurt';
-                            spawnParticles(entities.hero.x, entities.hero.y, '#00ffcc');
-                            setTimeout(() => entities.hero.state = 'idle', 300);
-                        }
-
-                        entities.enemy.targetX = width * 0.75;
-                        updateUI();
-
-                        if (player.hp <= 0) return lose();
-
-                        isProcessing = false;
-                        document.getElementById('btn-fight').disabled = false;
-                    }, 150);
-                }, 500);
-            }, 150);
-        }
-
-        function win() {
-            log(`🏆 <b>ПОБЕДА!</b> ${enemy.name} разрушен.`, '#ffd700');
-            player.exp += 50;
-            player.chapter++;
-            
-            if (player.exp >= 100) {
-                player.lvl++; player.exp = 0; player.maxHp += 15; player.dmg += 4;
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Atamura RPG</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        :root { --bg: #0d0d12; --panel: #16161e; --primary: #00ffcc; --epic: #a31aff; --legendary: #ff9f43; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; user-select: none; }
-        
-        /* Навигация (Вкладки) */
+        /* ВКЛАДКИ И НАВИГАЦИЯ */
+        #main-ui { display: none; flex-direction: column; height: 100vh; }
         .navbar { display: flex; background: #0a0a0f; border-bottom: 1px solid #222; }
-        .nav-btn { flex: 1; padding: 15px 0; text-align: center; color: #888; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .nav-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); background: rgba(0,255,204,0.1); }
-        
-        /* Основные экраны */
-        .screen { display: none; padding: 15px; height: calc(100vh - 55px); box-sizing: border-box; overflow-y: auto; }
+        .nav-btn { flex: 1; padding: 15px 0; text-align: center; color: #888; font-weight: bold; cursor: pointer; }
+        .nav-btn.active { color: #ff9f43; border-bottom: 2px solid #ff9f43; background: rgba(255,159,67,0.1); }
+        .screen { display: none; flex: 1; padding: 15px; overflow-y: auto; box-sizing: border-box; }
         .screen.active { display: block; }
         
-        /* Дизайн панелей */
-        .card { background: var(--panel); border: 1px solid #222; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: #000; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        /* ЭЛЕМЕНТЫ ИНТЕРФЕЙСА */
+        .card { background: #16161e; border: 1px solid #222; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; background: linear-gradient(135deg, #ff9f43, #d35400); color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn:disabled { background: #333; color: #666; }
         
-        /* Сетка инвентаря и магазина */
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .item-slot { background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; }
-        .item-name { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
-        .rarity-common { color: #fff; }
-        .rarity-rare { color: #0088ff; }
-        .rarity-epic { color: var(--epic); text-shadow: 0 0 5px rgba(163,26,255,0.5); }
-        .rarity-legendary { color: var(--legendary); text-shadow: 0 0 8px rgba(255,159,67,0.8); }
+        /* АНИМАЦИЯ СПРАЙТОВ (Твои картинки) */
+        .arena-container { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .char-box { width: 48%; text-align: center; }
+        .avatar-box { width: 140px; height: 140px; margin: 0 auto; overflow: hidden; position: relative; }
+        .sprite { width: 140px; height: 140px; background-repeat: no-repeat; image-rendering: pixelated; }
         
-        /* Арена */
-        #combat-log { height: 120px; background: #000; padding: 10px; overflow-y: auto; font-size: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #222; }
-        .hp-bar-bg { width: 100%; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin: 5px 0; }
+        /* Берем первые 4 кадра анимации Idle из твоих файлов */
+        .hero-sprite { background-image: url('gladiator.png'); background-position: 0px -140px; animation: playIdle 0.8s steps(4) infinite; }
+        .enemy-sprite { background-image: url('skeleton.png'); background-position: 0px -140px; animation: playIdle 0.8s steps(4) infinite; transform: scaleX(-1); }
+        @keyframes playIdle { from { background-position-x: 0px; } to { background-position-x: -560px; } }
+        
+        /* Анимация ударов */
+        .atk-hero { animation: lungeRight 0.3s ease; }
+        .atk-enemy { animation: lungeLeft 0.3s ease; }
+        .hurt { animation: shake 0.3s ease; filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5); }
+        @keyframes lungeRight { 50% { transform: translateX(30px); } }
+        @keyframes lungeLeft { 50% { transform: translateX(-30px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        
+        /* ПОЛОСКИ ЗДОРОВЬЯ */
+        .hp-bg { width: 100%; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin-top: 5px; }
         .hp-fill { height: 100%; transition: width 0.3s; }
-        .hp-hero { background: var(--primary); }
-        .hp-enemy { background: #ff3366; }
+        
+        /* ЛОГ БОЯ */
+        #log { height: 100px; background: #000; padding: 10px; overflow-y: auto; font-size: 12px; border: 1px solid #333; border-radius: 8px; margin-bottom: 15px; }
+        
+        /* ИНВЕНТАРЬ И МАГАЗИН (Система редкости) */
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .item { background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; }
+        .rarity-common { color: #fff; }
+        .rarity-rare { color: #00a8ff; }
+        .rarity-epic { color: #a31aff; }
+        .rarity-legend { color: #ff9f43; text-shadow: 0 0 5px rgba(255,159,67,0.5); }
     </style>
 </head>
 <body>
-
-    <div class="navbar">
-        <div class="nav-btn active" onclick="switchTab('arena')">⚔️ Арена</div>
-        <div class="nav-btn" onclick="switchTab('bag')">🎒 Сумка</div>
-        <div class="nav-btn" onclick="switchTab('shop')">💰 Магазин</div>
+    <div id="start-screen">
+        <h1 style="color: #ff9f43;">ХРОНИКИ АТАМУРЫ</h1>
+        <p style="color: #aaa; font-size: 12px;">Нажмите кнопку для инициализации RPG движка</p>
+        <button class="btn" style="width: 80%; margin-top: 20px;" onclick="initGame()">ВОЙТИ В ИГРУ</button>
     </div>
 
-    <div id="arena" class="screen active">
-        <div class="card" style="display: flex; justify-content: space-between;">
-            <div style="width: 45%;">
-                <div style="color: var(--primary); font-weight: bold;" id="hero-name">Герой</div>
-                <div style="font-size: 11px; color:#aaa;" id="hero-stats">Ур.1 | 💰 <span id="gold-display">0</span></div>
-                <div class="hp-bar-bg"><div class="hp-fill hp-hero" id="hero-hp"></div></div>
-            </div>
-            <div style="width: 45%; text-align: right;">
-                <div style="color: #ff3366; font-weight: bold;" id="enemy-name">Скелет</div>
-                <div style="font-size: 11px; color:#aaa;">Глава <span id="chapter-display">1</span></div>
-                <div class="hp-bar-bg"><div class="hp-fill hp-enemy" id="enemy-hp"></div></div>
-            </div>
-        </div>
+    <div id="main-ui">
         
-        <div id="combat-log"><div style="color:#00ffcc">Вы вошли на Арену. Сражение начинается!</div></div>
-        
-        <div class="card">
-            <button class="btn" id="atk-btn" onclick="attackTurn()">⚡️ НАНЕСТИ УДАР</button>
+        <div class="navbar">
+            <div class="nav-btn active" onclick="switchTab('arena')">⚔️ Арена</div>
+            <div class="nav-btn" onclick="switchTab('bag')">🎒 Сумка</div>
+            <div class="nav-btn" onclick="switchTab('shop')">💰 Торговец</div>
         </div>
-    </div>
 
-    <div id="bag" class="screen">
-        <div class="card">
-            <h3 style="margin-top:0;">Ваша Экипировка</h3>
-            <div style="font-size: 12px; color: #aaa; margin-bottom: 10px;">Бонус к урону: <span id="bonus-dmg" style="color:var(--primary)">+0</span></div>
-            <div class="grid" id="inventory-grid">
+        <div id="arena" class="screen active">
+            <div class="arena-container">
+                <div class="char-box" id="hero-box">
+                    <div style="font-weight: bold; color: #ff9f43;" id="hero-name">Гладиатор</div>
+                    <div style="font-size: 11px; color:#aaa;" id="hero-stats">Ур. 1</div>
+                    <div class="hp-bg"><div class="hp-fill" style="background:#2ecc71;" id="hero-hp"></div></div>
+                    <div class="avatar-box"><div class="sprite hero-sprite"></div></div>
                 </div>
+                <div class="char-box" id="enemy-box">
+                    <div style="font-weight: bold; color: #a31aff;" id="enemy-name">Скелет</div>
+                    <div style="font-size: 11px; color:#aaa;">Враг</div>
+                    <div class="hp-bg"><div class="hp-fill" style="background:#e74c3c;" id="enemy-hp"></div></div>
+                    <div class="avatar-box"><div class="sprite enemy-sprite"></div></div>
+                </div>
+            </div>
+            
+            <div id="log"><div style="color:#ff9f43">⚔️ Битва началась!</div></div>
+            <button class="btn" id="atk-btn" onclick="attackTurn()">АТАКОВАТЬ</button>
         </div>
-    </div>
 
-    <div id="shop" class="screen">
-        <div class="card">
-            <h3 style="margin-top:0;">Торговец</h3>
-            <p style="font-size: 12px; color: #aaa;">У вас 💰 <span id="shop-gold">0</span></p>
-            <div class="grid">
-                <div class="item-slot">
-                    <div class="item-name rarity-common">Малое зелье ХП</div>
-                    <div style="font-size: 10px; color:#888;">Восстанавливает 50 HP</div>
-                    <button class="btn" style="padding: 8px; font-size: 12px;" onclick="buyItem('potion')">Купить (10 💰)</button>
-                </div>
-                <div class="item-slot">
-                    <div class="item-name rarity-rare">Стальной Меч</div>
-                    <div style="font-size: 10px; color:#888;">Урон +5</div>
-                    <button class="btn" style="padding: 8px; font-size: 12px;" onclick="buyItem('sword1')">Купить (50 💰)</button>
+        <div id="bag" class="screen">
+            <div class="card">
+                <h3 style="margin-top: 0;">Ваша Экипировка</h3>
+                <p style="font-size: 12px; color: #aaa;">Бонус силы: <span id="bonus-dmg" style="color:#ff9f43">+0</span></p>
+                <p style="font-size: 12px; color: #aaa;">Золото: 💰 <span class="gold-display">0</span></p>
+                <div class="grid" id="inventory-grid"></div>
+            </div>
+            <button class="btn" style="background: #27ae60;" onclick="saveToBot()">💾 СОХРАНИТЬ В БАЗУ</button>
+        </div>
+
+        <div id="shop" class="screen">
+            <div class="card">
+                <h3 style="margin-top: 0;">Лавка Торговца</h3>
+                <p style="font-size: 12px; color: #aaa;">Золото: 💰 <span class="gold-display">0</span></p>
+                <div class="grid">
+                    <div class="item">
+                        <div class="rarity-common" style="font-weight:bold;font-size:12px;">Эликсир Жизни</div>
+                        <div style="font-size:10px;color:#888;margin:5px 0;">+50 HP</div>
+                        <button class="btn" style="padding:8px;font-size:12px;" onclick="buyItem('potion')">15 💰</button>
+                    </div>
+                    <div class="item">
+                        <div class="rarity-epic" style="font-weight:bold;font-size:12px;">Меч Титана</div>
+                        <div style="font-size:10px;color:#888;margin:5px 0;">Урон +12</div>
+                        <button class="btn" style="padding:8px;font-size:12px;" onclick="buyItem('sword')">100 💰</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -467,27 +129,24 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // База данных игрока (в идеале это загружается с твоего Python-сервера)
-        let player = { 
-            name: "Игрок", hp: 100, maxHp: 100, baseDmg: 10, lvl: 1, gold: 0, chapter: 1,
-            inventory: []
-        };
-        let enemy = { name: "Гоблин", hp: 50, maxHp: 50, dmg: 5 };
+        let player = { name: "Гладиатор", hp: 100, maxHp: 100, baseDmg: 15, lvl: 1, gold: 0, inventory: [] };
+        let enemy = { name: "Скелет-Страж", hp: 80, maxHp: 80, dmg: 10 };
         
-        // База лута (Таблицы выпадения)
+        // Таблица лута с шансами (Gacha система)
         const lootTable = [
-            { id: "junk", name: "Ржавый кинжал", rarity: "common", bonus: 1, chance: 60 },
-            { id: "sword2", name: "Рыцарский меч", rarity: "rare", bonus: 8, chance: 30 },
-            { id: "axe", name: "Топор Палача", rarity: "epic", bonus: 15, chance: 9 },
-            { id: "legend", name: "Клинок Атамуры", rarity: "legendary", bonus: 35, chance: 1 }
+            { name: "Ржавый кинжал", rarity: "common", bonus: 2, chance: 50 },
+            { name: "Кольчуга", rarity: "rare", bonus: 6, chance: 30 },
+            { name: "Топор Палача", rarity: "epic", bonus: 15, chance: 15 },
+            { name: "КЛИНОК БОГОВ", rarity: "legend", bonus: 40, chance: 5 }
         ];
 
-        window.onload = () => {
+        function initGame() {
             if (tg.initDataUnsafe?.user?.first_name) player.name = tg.initDataUnsafe.user.first_name;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('main-ui').style.display = 'flex';
             updateUI();
-        };
+        }
 
-        // --- ЛОГИКА ВКЛАДОК ---
         function switchTab(tabId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -496,120 +155,119 @@
             updateUI();
         }
 
-        // --- БОЕВАЯ СИСТЕМА ---
         function getTotalDmg() {
-            let bonus = player.inventory.reduce((sum, item) => sum + item.bonus, 0);
-            return player.baseDmg + bonus;
+            return player.baseDmg + player.inventory.reduce((s, i) => s + i.bonus, 0);
         }
 
         function attackTurn() {
             let btn = document.getElementById('atk-btn');
+            if(btn.disabled) return;
             btn.disabled = true;
 
-            // Игрок бьет
-            let dmg = getTotalDmg() + Math.floor(Math.random() * 5);
-            enemy.hp -= dmg;
-            log(`💥 Вы нанесли ${dmg} урона.`, '#00ffcc');
+            let hBox = document.getElementById('hero-box');
+            let eBox = document.getElementById('enemy-box');
+            hBox.classList.remove('atk-hero','hurt'); eBox.classList.remove('atk-enemy','hurt');
+            void hBox.offsetWidth; void eBox.offsetWidth;
 
-            if (enemy.hp <= 0) return winMatch();
-
-            // Враг бьет
+            // Ход игрока
+            hBox.classList.add('atk-hero');
             setTimeout(() => {
-                let eDmg = enemy.dmg + Math.floor(Math.random() * 3);
-                player.hp -= eDmg;
-                log(`💀 ${enemy.name} наносит вам ${eDmg} урона.`, '#ff3366');
-                
-                if (player.hp <= 0) {
-                    log(`☠️ ВЫ ПОГИБЛИ.`, '#ff3366');
-                    player.hp = player.maxHp; // Воскрешение
-                }
+                let dmg = getTotalDmg() + Math.floor(Math.random() * 5);
+                enemy.hp -= dmg;
+                eBox.classList.add('hurt');
+                logMsg(`💥 Вы ударили на ${dmg} урона.`, '#2ecc71');
                 updateUI();
-                btn.disabled = false;
-            }, 500);
-            updateUI();
+
+                if(enemy.hp <= 0) return winMatch();
+
+                // Ответ врага
+                setTimeout(() => {
+                    eBox.classList.remove('hurt');
+                    eBox.classList.add('atk-enemy');
+                    setTimeout(() => {
+                        let eDmg = enemy.dmg + Math.floor(Math.random() * 3);
+                        player.hp -= eDmg;
+                        hBox.classList.add('hurt');
+                        logMsg(`💀 Скелет нанес ${eDmg} урона.`, '#e74c3c');
+                        updateUI();
+                        
+                        if(player.hp <= 0) {
+                            logMsg(`☠️ ВЫ ПОГИБЛИ.`, '#e74c3c');
+                            player.hp = player.maxHp;
+                        }
+                        btn.disabled = false;
+                    }, 150);
+                }, 500);
+            }, 150);
         }
 
-        // --- СИСТЕМА ВЫПАДЕНИЯ ЛУТА (Gacha/RNG) ---
         function rollLoot() {
-            let roll = Math.random() * 100;
-            let currentChance = 0;
-            
-            for (let item of lootTable) {
-                currentChance += item.chance;
-                if (roll <= currentChance) {
-                    player.inventory.push(item);
-                    return item;
-                }
+            let r = Math.random() * 100, cur = 0;
+            for(let item of lootTable) {
+                cur += item.chance;
+                if(r <= cur) return item;
             }
-            return null; // Ничего не выпало
+            return null;
         }
 
         function winMatch() {
-            let goldDrop = 15 * player.chapter;
-            player.gold += goldDrop;
-            log(`🏆 ПОБЕДА! Вы нашли ${goldDrop} 💰.`, '#ffd700');
-
-            // Шанс 40% на выпадение предмета из босса
-            if (Math.random() < 0.40) {
-                let loot = rollLoot();
-                if (loot) {
-                    let color = loot.rarity === 'legendary' ? '#ff9f43' : (loot.rarity === 'epic' ? '#a31aff' : '#0088ff');
-                    log(`🎁 ВЫПАЛ ПРЕДМЕТ: <span style="color:${color}">${loot.name}</span> (+${loot.bonus} к урону)! Загляните в Сумку.`, color);
-                }
+            let gold = 20 * player.lvl;
+            player.gold += gold;
+            logMsg(`🏆 ПОБЕДА! Найдено ${gold} 💰.`, '#f1c40f');
+            
+            // Шанс 40% на выпадение предмета
+            if(Math.random() < 0.4) {
+                let item = rollLoot();
+                player.inventory.push(item);
+                let color = item.rarity === 'legend' ? '#ff9f43' : (item.rarity === 'epic' ? '#a31aff' : (item.rarity === 'rare' ? '#00a8ff' : '#fff'));
+                logMsg(`🎁 ВЫПАЛ ЛУТ: <span style="color:${color}">${item.name} (+${item.bonus} к силе)</span>!`, color);
             }
 
-            player.chapter++;
-            enemy.maxHp += 25; enemy.hp = enemy.maxHp; enemy.dmg += 3;
+            player.lvl++;
+            enemy.maxHp += 15; enemy.hp = enemy.maxHp; enemy.dmg += 2;
             document.getElementById('atk-btn').disabled = false;
             updateUI();
         }
 
-        // --- МАГАЗИН ---
         function buyItem(id) {
-            if (id === 'potion' && player.gold >= 10) {
-                player.gold -= 10;
-                player.hp = Math.min(player.maxHp, player.hp + 50);
-                tg.showAlert("Зелье выпито! Здоровье восстановлено.");
-            } else if (id === 'sword1' && player.gold >= 50) {
-                player.gold -= 50;
-                player.inventory.push({ name: "Стальной Меч", rarity: "rare", bonus: 5 });
-                tg.showAlert("Оружие куплено и добавлено в сумку!");
+            if(id === 'potion' && player.gold >= 15) {
+                player.gold -= 15; player.hp = Math.min(player.maxHp, player.hp + 50);
+                tg.showAlert("Вы выпили эликсир!");
+            } else if(id === 'sword' && player.gold >= 100) {
+                player.gold -= 100; player.inventory.push({name: "Меч Титана", rarity: "epic", bonus: 12});
+                tg.showAlert("Меч добавлен в инвентарь!");
             } else {
                 tg.showAlert("Недостаточно золота!");
             }
             updateUI();
         }
 
-        // --- ОБНОВЛЕНИЕ ИНТЕРФЕЙСА ---
         function updateUI() {
-            // Арена
             document.getElementById('hero-name').innerText = player.name;
-            document.getElementById('hero-hp').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
-            document.getElementById('enemy-hp').style.width = `${Math.max(0, (enemy.hp / enemy.maxHp) * 100)}%`;
-            document.getElementById('gold-display').innerText = player.gold;
-            document.getElementById('shop-gold').innerText = player.gold;
-            document.getElementById('chapter-display').innerText = player.chapter;
-
-            // Сумка
-            let bonusSum = player.inventory.reduce((sum, item) => sum + item.bonus, 0);
-            document.getElementById('bonus-dmg').innerText = `+${bonusSum}`;
+            document.getElementById('hero-stats').innerText = `Ур. ${player.lvl}`;
+            document.getElementById('hero-hp').style.width = `${Math.max(0, (player.hp/player.maxHp)*100)}%`;
+            document.getElementById('enemy-hp').style.width = `${Math.max(0, (enemy.hp/enemy.maxHp)*100)}%`;
             
-            let bagHtml = '';
-            if (player.inventory.length === 0) bagHtml = '<div style="grid-column: span 2; color:#555;">Сумка пуста</div>';
-            player.inventory.forEach(item => {
-                bagHtml += `
-                    <div class="item-slot">
-                        <div class="item-name rarity-${item.rarity}">${item.name}</div>
-                        <div style="font-size: 10px; color:#888;">Урон +${item.bonus}</div>
-                    </div>`;
+            document.querySelectorAll('.gold-display').forEach(el => el.innerText = player.gold);
+            document.getElementById('bonus-dmg').innerText = `+${player.inventory.reduce((s,i)=>s+i.bonus,0)}`;
+            
+            let bag = document.getElementById('inventory-grid');
+            bag.innerHTML = player.inventory.length ? '' : '<div style="color:#555;grid-column:span 2;">Пусто</div>';
+            player.inventory.forEach(i => {
+                bag.innerHTML += `<div class="item"><div class="rarity-${i.rarity}" style="font-weight:bold;font-size:12px;">${i.name}</div><div style="font-size:10px;color:#888;">+${i.bonus} к силе</div></div>`;
             });
-            document.getElementById('inventory-grid').innerHTML = bagHtml;
         }
 
-        function log(text, color) {
-            let logBox = document.getElementById('combat-log');
-            logBox.innerHTML += `<div style="color:${color}; margin-bottom:5px;">${text}</div>`;
-            logBox.scrollTop = logBox.scrollHeight;
+        function logMsg(txt, col) {
+            let log = document.getElementById('log');
+            log.innerHTML += `<div style="color:${col};margin-bottom:4px;">${txt}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ОТПРАВКА ДАННЫХ В PYTHON БОТ
+        function saveToBot() {
+            tg.sendData(JSON.stringify({ action: "save_loot", gold: player.gold, inventory: player.inventory, lvl: player.lvl }));
+            tg.showAlert("Данные успешно отправлены в Telegram-бот!");
         }
     </script>
 </body>
