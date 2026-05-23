@@ -5,10 +5,10 @@ tg.expand();
 // Настройки движка Phaser
 const config = {
     type: Phaser.AUTO,
-    parent: 'game-container', // ID div-а из HTML
+    parent: 'game-container',
     width: window.innerWidth,
     height: window.innerHeight,
-    transparent: true, // Прозрачный фон, если захочешь задать его через CSS
+    transparent: true,
     scene: {
         preload: preload,
         create: create,
@@ -22,18 +22,56 @@ let enemySprite;
 
 // 1. ЗАГРУЗКА АССЕТОВ
 function preload() {
-    // Грузим фон (положи любую картинку bg.jpg в папку assets)
-    // this.load.image('bg', 'assets/bg.jpg'); 
-
-    // Загружаем твои Спрайт-листы. 
-    // ВНИМАНИЕ: frameWidth и frameHeight должны точно совпадать с размером ОДНОГО кадра в твоей картинке!
+    // Устанавливаем точный размер одного кадра для твоих спрайт-листов - 256x256 пикселей
     this.load.spritesheet('gladiator', 'gladiator.png', { 
-        frameWidth: 128, 
-        frameHeight: 128 
+        frameWidth: 256, 
+        frameHeight: 256 
     });
     
     this.load.spritesheet('skeleton', 'skeleton.png', { 
-        frameWidth: 128, 
+        frameWidth: 256, 
+        frameHeight: 256 
+    });
+}
+
+// 2. СОЗДАНИЕ СЦЕНЫ И АНИМАЦИЙ
+function create() {
+    const centerY = window.innerHeight / 2 - 40;
+    const playerX = window.innerWidth * 0.25;
+    const enemyX = window.innerWidth * 0.75;
+
+    // Добавляем спрайты. Смещаем их чуть ниже, так как сетка кадра большая
+    playerSprite = this.add.sprite(playerX, centerY, 'gladiator').setScale(1.2);
+    enemySprite = this.add.sprite(enemyX, centerY, 'skeleton').setScale(1.2);
+
+    // Зеркалим врага, чтобы он смотрел на игрока
+    enemySprite.setFlipX(true);
+
+    // --- НАСТРОЙКА АНИМАЦИЙ (Используем точные номера кадров из твоих файлов) ---
+    
+    // Для Гладиатора: берем первые 4 кадра анимации IDLE (они идут сразу под текстом)
+    // В сетке 256x256 на твоих листах первая строка героев - это кадры с 4 по 7.
+    this.anims.create({
+        key: 'hero_idle',
+        frames: this.anims.generateFrameNumbers('gladiator', { start: 4, end: 7 }),
+        frameRate: 5,
+        repeat: -1
+    });
+
+    // Для Скелета: точно так же берем кадры анимации IDLE со второй строки
+    this.anims.create({
+        key: 'enemy_idle',
+        frames: this.anims.generateFrameNumbers('skeleton', { start: 4, end: 7 }),
+        frameRate: 5,
+        repeat: -1
+    });
+
+    // ЗАПУСКАЕМ АНИМАЦИИ!
+    playerSprite.play('hero_idle');
+    enemySprite.play('enemy_idle');
+}
+
+function update() {}
         frameHeight: 128 
     });
 }
