@@ -364,47 +364,253 @@
             
             if (player.exp >= 100) {
                 player.lvl++; player.exp = 0; player.maxHp += 15; player.dmg += 4;
-                log(`⭐ НОВЫЙ УРОВЕНЬ! Теперь вы ${player.lvl} уровня.`, '#00ffcc');
-            }
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Atamura RPG</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root { --bg: #0d0d12; --panel: #16161e; --primary: #00ffcc; --epic: #a31aff; --legendary: #ff9f43; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; user-select: none; }
+        
+        /* Навигация (Вкладки) */
+        .navbar { display: flex; background: #0a0a0f; border-bottom: 1px solid #222; }
+        .nav-btn { flex: 1; padding: 15px 0; text-align: center; color: #888; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .nav-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); background: rgba(0,255,204,0.1); }
+        
+        /* Основные экраны */
+        .screen { display: none; padding: 15px; height: calc(100vh - 55px); box-sizing: border-box; overflow-y: auto; }
+        .screen.active { display: block; }
+        
+        /* Дизайн панелей */
+        .card { background: var(--panel); border: 1px solid #222; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: #000; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn:disabled { background: #333; color: #666; }
+        
+        /* Сетка инвентаря и магазина */
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .item-slot { background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; }
+        .item-name { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        .rarity-common { color: #fff; }
+        .rarity-rare { color: #0088ff; }
+        .rarity-epic { color: var(--epic); text-shadow: 0 0 5px rgba(163,26,255,0.5); }
+        .rarity-legendary { color: var(--legendary); text-shadow: 0 0 8px rgba(255,159,67,0.8); }
+        
+        /* Арена */
+        #combat-log { height: 120px; background: #000; padding: 10px; overflow-y: auto; font-size: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #222; }
+        .hp-bar-bg { width: 100%; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin: 5px 0; }
+        .hp-fill { height: 100%; transition: width 0.3s; }
+        .hp-hero { background: var(--primary); }
+        .hp-enemy { background: #ff3366; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="nav-btn active" onclick="switchTab('arena')">⚔️ Арена</div>
+        <div class="nav-btn" onclick="switchTab('bag')">🎒 Сумка</div>
+        <div class="nav-btn" onclick="switchTab('shop')">💰 Магазин</div>
+    </div>
+
+    <div id="arena" class="screen active">
+        <div class="card" style="display: flex; justify-content: space-between;">
+            <div style="width: 45%;">
+                <div style="color: var(--primary); font-weight: bold;" id="hero-name">Герой</div>
+                <div style="font-size: 11px; color:#aaa;" id="hero-stats">Ур.1 | 💰 <span id="gold-display">0</span></div>
+                <div class="hp-bar-bg"><div class="hp-fill hp-hero" id="hero-hp"></div></div>
+            </div>
+            <div style="width: 45%; text-align: right;">
+                <div style="color: #ff3366; font-weight: bold;" id="enemy-name">Скелет</div>
+                <div style="font-size: 11px; color:#aaa;">Глава <span id="chapter-display">1</span></div>
+                <div class="hp-bar-bg"><div class="hp-fill hp-enemy" id="enemy-hp"></div></div>
+            </div>
+        </div>
+        
+        <div id="combat-log"><div style="color:#00ffcc">Вы вошли на Арену. Сражение начинается!</div></div>
+        
+        <div class="card">
+            <button class="btn" id="atk-btn" onclick="attackTurn()">⚡️ НАНЕСТИ УДАР</button>
+        </div>
+    </div>
+
+    <div id="bag" class="screen">
+        <div class="card">
+            <h3 style="margin-top:0;">Ваша Экипировка</h3>
+            <div style="font-size: 12px; color: #aaa; margin-bottom: 10px;">Бонус к урону: <span id="bonus-dmg" style="color:var(--primary)">+0</span></div>
+            <div class="grid" id="inventory-grid">
+                </div>
+        </div>
+    </div>
+
+    <div id="shop" class="screen">
+        <div class="card">
+            <h3 style="margin-top:0;">Торговец</h3>
+            <p style="font-size: 12px; color: #aaa;">У вас 💰 <span id="shop-gold">0</span></p>
+            <div class="grid">
+                <div class="item-slot">
+                    <div class="item-name rarity-common">Малое зелье ХП</div>
+                    <div style="font-size: 10px; color:#888;">Восстанавливает 50 HP</div>
+                    <button class="btn" style="padding: 8px; font-size: 12px;" onclick="buyItem('potion')">Купить (10 💰)</button>
+                </div>
+                <div class="item-slot">
+                    <div class="item-name rarity-rare">Стальной Меч</div>
+                    <div style="font-size: 10px; color:#888;">Урон +5</div>
+                    <button class="btn" style="padding: 8px; font-size: 12px;" onclick="buyItem('sword1')">Купить (50 💰)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // База данных игрока (в идеале это загружается с твоего Python-сервера)
+        let player = { 
+            name: "Игрок", hp: 100, maxHp: 100, baseDmg: 10, lvl: 1, gold: 0, chapter: 1,
+            inventory: []
+        };
+        let enemy = { name: "Гоблин", hp: 50, maxHp: 50, dmg: 5 };
+        
+        // База лута (Таблицы выпадения)
+        const lootTable = [
+            { id: "junk", name: "Ржавый кинжал", rarity: "common", bonus: 1, chance: 60 },
+            { id: "sword2", name: "Рыцарский меч", rarity: "rare", bonus: 8, chance: 30 },
+            { id: "axe", name: "Топор Палача", rarity: "epic", bonus: 15, chance: 9 },
+            { id: "legend", name: "Клинок Атамуры", rarity: "legendary", bonus: 35, chance: 1 }
+        ];
+
+        window.onload = () => {
+            if (tg.initDataUnsafe?.user?.first_name) player.name = tg.initDataUnsafe.user.first_name;
+            updateUI();
+        };
+
+        // --- ЛОГИКА ВКЛАДОК ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+            updateUI();
+        }
+
+        // --- БОЕВАЯ СИСТЕМА ---
+        function getTotalDmg() {
+            let bonus = player.inventory.reduce((sum, item) => sum + item.bonus, 0);
+            return player.baseDmg + bonus;
+        }
+
+        function attackTurn() {
+            let btn = document.getElementById('atk-btn');
+            btn.disabled = true;
+
+            // Игрок бьет
+            let dmg = getTotalDmg() + Math.floor(Math.random() * 5);
+            enemy.hp -= dmg;
+            log(`💥 Вы нанесли ${dmg} урона.`, '#00ffcc');
+
+            if (enemy.hp <= 0) return winMatch();
+
+            // Враг бьет
+            setTimeout(() => {
+                let eDmg = enemy.dmg + Math.floor(Math.random() * 3);
+                player.hp -= eDmg;
+                log(`💀 ${enemy.name} наносит вам ${eDmg} урона.`, '#ff3366');
+                
+                if (player.hp <= 0) {
+                    log(`☠️ ВЫ ПОГИБЛИ.`, '#ff3366');
+                    player.hp = player.maxHp; // Воскрешение
+                }
+                updateUI();
+                btn.disabled = false;
+            }, 500);
+            updateUI();
+        }
+
+        // --- СИСТЕМА ВЫПАДЕНИЯ ЛУТА (Gacha/RNG) ---
+        function rollLoot() {
+            let roll = Math.random() * 100;
+            let currentChance = 0;
             
-            endState("СЛЕДУЮЩАЯ ГЛАВА", loadChapter);
+            for (let item of lootTable) {
+                currentChance += item.chance;
+                if (roll <= currentChance) {
+                    player.inventory.push(item);
+                    return item;
+                }
+            }
+            return null; // Ничего не выпало
         }
 
-        function lose() {
-            log(`💀 <b>ВЫ ПОГИБЛИ.</b> Тьма поглощает вас...`, '#ff3366');
-            player.hp = player.maxHp;
-            endState("ВОЗРОДИТЬСЯ", loadChapter);
+        function winMatch() {
+            let goldDrop = 15 * player.chapter;
+            player.gold += goldDrop;
+            log(`🏆 ПОБЕДА! Вы нашли ${goldDrop} 💰.`, '#ffd700');
+
+            // Шанс 40% на выпадение предмета из босса
+            if (Math.random() < 0.40) {
+                let loot = rollLoot();
+                if (loot) {
+                    let color = loot.rarity === 'legendary' ? '#ff9f43' : (loot.rarity === 'epic' ? '#a31aff' : '#0088ff');
+                    log(`🎁 ВЫПАЛ ПРЕДМЕТ: <span style="color:${color}">${loot.name}</span> (+${loot.bonus} к урону)! Загляните в Сумку.`, color);
+                }
+            }
+
+            player.chapter++;
+            enemy.maxHp += 25; enemy.hp = enemy.maxHp; enemy.dmg += 3;
+            document.getElementById('atk-btn').disabled = false;
+            updateUI();
         }
 
-        function endState(btnText, callback) {
-            let btn = document.getElementById('btn-fight');
-            btn.disabled = false;
-            btn.innerText = btnText;
-            btn.onclick = () => {
-                player.hp = player.maxHp;
-                btn.innerText = "АТАКОВАТЬ";
-                btn.onclick = executeTurn;
-                isProcessing = false;
-                callback();
-            };
+        // --- МАГАЗИН ---
+        function buyItem(id) {
+            if (id === 'potion' && player.gold >= 10) {
+                player.gold -= 10;
+                player.hp = Math.min(player.maxHp, player.hp + 50);
+                tg.showAlert("Зелье выпито! Здоровье восстановлено.");
+            } else if (id === 'sword1' && player.gold >= 50) {
+                player.gold -= 50;
+                player.inventory.push({ name: "Стальной Меч", rarity: "rare", bonus: 5 });
+                tg.showAlert("Оружие куплено и добавлено в сумку!");
+            } else {
+                tg.showAlert("Недостаточно золота!");
+            }
+            updateUI();
         }
 
+        // --- ОБНОВЛЕНИЕ ИНТЕРФЕЙСА ---
         function updateUI() {
-            document.getElementById('ui-hero-name').innerText = player.name;
-            document.getElementById('ui-hero-stats').innerText = `Ур. ${player.lvl} | HP: ${Math.max(0, player.hp)}/${player.maxHp}`;
-            document.getElementById('ui-hero-hp').style.width = `${(player.hp / player.maxHp) * 100}%`;
+            // Арена
+            document.getElementById('hero-name').innerText = player.name;
+            document.getElementById('hero-hp').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+            document.getElementById('enemy-hp').style.width = `${Math.max(0, (enemy.hp / enemy.maxHp) * 100)}%`;
+            document.getElementById('gold-display').innerText = player.gold;
+            document.getElementById('shop-gold').innerText = player.gold;
+            document.getElementById('chapter-display').innerText = player.chapter;
 
-            document.getElementById('ui-enemy-name').innerText = enemy.name;
-            document.getElementById('ui-enemy-stats').innerText = `HP: ${Math.max(0, enemy.hp)}/${enemy.maxHp}`;
-            document.getElementById('ui-enemy-hp').style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+            // Сумка
+            let bonusSum = player.inventory.reduce((sum, item) => sum + item.bonus, 0);
+            document.getElementById('bonus-dmg').innerText = `+${bonusSum}`;
+            
+            let bagHtml = '';
+            if (player.inventory.length === 0) bagHtml = '<div style="grid-column: span 2; color:#555;">Сумка пуста</div>';
+            player.inventory.forEach(item => {
+                bagHtml += `
+                    <div class="item-slot">
+                        <div class="item-name rarity-${item.rarity}">${item.name}</div>
+                        <div style="font-size: 10px; color:#888;">Урон +${item.bonus}</div>
+                    </div>`;
+            });
+            document.getElementById('inventory-grid').innerHTML = bagHtml;
         }
 
         function log(text, color) {
-            let box = document.getElementById('log-container');
-            box.innerHTML += `<div style="color: ${color}; margin-bottom: 5px; line-height: 1.4;">${text}</div>`;
-            box.scrollTop = box.scrollHeight;
+            let logBox = document.getElementById('combat-log');
+            logBox.innerHTML += `<div style="color:${color}; margin-bottom:5px;">${text}</div>`;
+            logBox.scrollTop = logBox.scrollHeight;
         }
     </script>
 </body>
-  </html>
-  
+</html>
